@@ -72,7 +72,7 @@
     "node-fetch": "^3.0.0",
     "patch-package": "^6.4.7",
     "rimraf": "^3.0.2",
-    "scrypt-bitcore-lib": "^10.0.25",
+    "scrypt-bitcore-lib": "^10.0.26",
     "yargs": "^17.6.2"
   }
 }
