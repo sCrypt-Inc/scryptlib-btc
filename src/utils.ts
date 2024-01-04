@@ -167,7 +167,7 @@ export function hexStringToBytes(hex: string): number[] {
 }
 
 
-export function signTx(tx: btc.Transaction, privateKey: btc.PrivateKey, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE, flags = DEFAULT_FLAGS): string {
+export function signTx(tx: btc.Transaction, privateKey: btc.PrivateKey, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE): string {
 
   if (!tx) {
     throw new Error('param tx can not be empty');
