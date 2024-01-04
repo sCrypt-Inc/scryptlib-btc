@@ -1,4 +1,3 @@
-// @ts-ignore
 import * as btc from 'scrypt-bitcore-lib';
 import { parseChunked, stringifyStream } from '@discoveryjs/json-ext';
 import * as bsv from 'bsv';
