@@ -4,7 +4,7 @@ export {
 } from './internal';
 
 export {
-  bsv, toHex, bin2num, int2Asm, bytes2Literal, bytesToHexString, getValidatedHexString,
+  btc, bsv, toHex, bin2num, int2Asm, bytes2Literal, bytesToHexString, getValidatedHexString,
   findStructByType, findStructByName, isArrayType,
   arrayTypeAndSize, newCall, getNameByType, genLaunchConfigFile, subArrayType,
   isGenericType, parseGenericType,

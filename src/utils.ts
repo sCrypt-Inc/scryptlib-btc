@@ -1,3 +1,5 @@
+// @ts-ignore
+import * as btc from 'scrypt-bitcore-lib';
 import { parseChunked, stringifyStream } from '@discoveryjs/json-ext';
 import * as bsv from 'bsv';
 import * as crypto from 'crypto';
@@ -7,14 +9,15 @@ import { decode } from '@jridgewell/sourcemap-codec';
 import { fileURLToPath, pathToFileURL } from 'url';
 
 export { bsv };
+export { btc };
 
 import { ABIEntity, LibraryEntity } from '.';
 import { compileAsync, OpCode } from './compilerWrapper';
 import { AbstractContract, compile, CompileResult, findCompiler, getValidatedHexString, Script, ScryptType, StructEntity, SupportedParamType } from './internal';
 import { arrayTypeAndSizeStr, isGenericType, parseGenericType } from './typeCheck';
 
-const BN = bsv.crypto.BN;
-const Interp = bsv.Script.Interpreter;
+const BN = btc.crypto.BN;
+const Interp = btc.Script.Interpreter;
 
 export const DEFAULT_FLAGS =
   //Interp.SCRIPT_VERIFY_P2SH | Interp.SCRIPT_VERIFY_CLEANSTACK | // no longer applies now p2sh is deprecated: cleanstack only applies to p2sh
@@ -27,7 +30,7 @@ export const DEFAULT_FLAGS =
   Interp.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY | Interp.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY | Interp.SCRIPT_VERIFY_CLEANSTACK;
 
 export const DEFAULT_SIGHASH_TYPE =
-  bsv.crypto.Signature.SIGHASH_ALL | bsv.crypto.Signature.SIGHASH_FORKID;
+  btc.crypto.Signature.SIGHASH_ALL | btc.crypto.Signature.SIGHASH_FORKID;
 
 
 /**
@@ -165,7 +168,7 @@ export function hexStringToBytes(hex: string): number[] {
 }
 
 
-export function signTx(tx: bsv.Transaction, privateKey: bsv.PrivateKey, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE, flags = DEFAULT_FLAGS): string {
+export function signTx(tx: btc.Transaction, privateKey: btc.PrivateKey, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE, flags = DEFAULT_FLAGS): string {
 
   if (!tx) {
     throw new Error('param tx can not be empty');
@@ -187,16 +190,26 @@ export function signTx(tx: bsv.Transaction, privateKey: bsv.PrivateKey, lockingS
     throw new Error('Breaking change: LockingScript in ASM format is no longer supported, please use the lockingScript object directly');
   }
 
-  return toHex(bsv.Transaction.Sighash.sign(
+  // TODO: flags, amount?
+  //return toHex(btc.Transaction.Sighash.sign(
+  //  tx, privateKey, sighashType, inputIndex,
+  //  lockingScript, new btc.crypto.BN(inputAmount), flags
+  //).toTxFormat());
+
+  const scriptBuffer = Buffer.from(lockingScript.toHex(), 'hex')
+  const satoshisBuffer = new btc.encoding.BufferWriter()
+    .writeUInt64LEBN(new btc.crypto.BN(inputAmount)).toBuffer();
+
+  return toHex(btc.Transaction.SighashWitness.sign(
     tx, privateKey, sighashType, inputIndex,
-    lockingScript, new bsv.crypto.BN(inputAmount), flags
+    scriptBuffer, satoshisBuffer, 'ecdsa'
   ).toTxFormat());
 }
 
 
 
-export function getPreimage(tx: bsv.Transaction, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE, flags = DEFAULT_FLAGS): string {
-  const preimageBuf = bsv.Transaction.Sighash.sighashPreimage(tx, sighashType, inputIndex, lockingScript, new bsv.crypto.BN(inputAmount), flags);
+export function getPreimage(tx: btc.Transaction, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE, flags = DEFAULT_FLAGS): string {
+  const preimageBuf = btc.Transaction.Sighash.sighashPreimage(tx, sighashType, inputIndex, lockingScript, new btc.crypto.BN(inputAmount), flags);
   return toHex(preimageBuf);
 }
 
@@ -209,11 +222,11 @@ export function hashIsPositiveNumber(sighash: Buffer): boolean {
 }
 
 
-export function getLowSPreimage(tx: bsv.Transaction, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE, flags = DEFAULT_FLAGS): string {
+export function getLowSPreimage(tx: btc.Transaction, lockingScript: Script, inputAmount: number, inputIndex = 0, sighashType = DEFAULT_SIGHASH_TYPE, flags = DEFAULT_FLAGS): string {
 
   for (let i = 0; i < Number.MAX_SAFE_INTEGER; i++) {
     const preimage = getPreimage(tx, lockingScript, inputAmount, inputIndex, sighashType, flags);
-    const sighash = bsv.crypto.Hash.sha256sha256(Buffer.from(preimage, 'hex'));
+    const sighash = btc.crypto.Hash.sha256sha256(Buffer.from(preimage, 'hex'));
     const msb = sighash.readUInt8();
     if (msb < MSB_THRESHOLD && hashIsPositiveNumber(sighash)) {
       return preimage;
@@ -450,7 +463,7 @@ function escapeRegExp(stringToGoIntoTheRegex: string) {
 
 
 
-export function buildContractCode(hexTemplateArgs: Map<string, string>, hexTemplateInlineASM: Map<string, string>, hexTemplate: string): bsv.Script {
+export function buildContractCode(hexTemplateArgs: Map<string, string>, hexTemplateInlineASM: Map<string, string>, hexTemplate: string): btc.Script {
 
 
   let lsHex = hexTemplate;
@@ -468,7 +481,7 @@ export function buildContractCode(hexTemplateArgs: Map<string, string>, hexTempl
     lsHex = lsHex.replace(new RegExp(`${escapeRegExp(name)}`, 'g'), value);
   }
 
-  return bsv.Script.fromHex(lsHex);
+  return btc.Script.fromHex(lsHex);
 
 }
 
@@ -493,7 +506,7 @@ export function parseAbiFromUnlockingScript(contract: AbstractContract, hex: str
     return pubFunAbis[0];
   }
 
-  const script = bsv.Script.fromHex(hex);
+  const script = btc.Script.fromHex(hex);
 
   const usASM = script.toASM() as string;
 
@@ -599,20 +612,20 @@ export function md5(s: string): string {
 }
 
 
-export function checkNOPScript(nopScript: bsv.Script) {
+export function checkNOPScript(nopScript: btc.Script) {
 
-  bsv.Script.Interpreter.MAX_SCRIPT_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
-  bsv.Script.Interpreter.MAXIMUM_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
+  btc.Script.Interpreter.MAX_SCRIPT_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
+  btc.Script.Interpreter.MAXIMUM_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
 
-  const bsi = new bsv.Script.Interpreter();
-  const tx = new bsv.Transaction().from({
+  const bsi = new btc.Script.Interpreter();
+  const tx = new btc.Transaction().from({
     txId: 'a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458',
     outputIndex: 0,
     script: '',   // placeholder
     satoshis: 1
   });
 
-  const result = bsi.verify(new bsv.Script(""), nopScript, tx, 0, DEFAULT_FLAGS, new bsv.crypto.BN(1));
+  const result = bsi.verify(new btc.Script(""), nopScript, tx, 0, DEFAULT_FLAGS, new btc.crypto.BN(1));
 
   if (result || bsi.errstr !== "SCRIPT_ERR_EVAL_FALSE_NO_RESULT") {
     throw new Error("NopScript should be a script that does not affect the Bitcoin virtual machine stack.");

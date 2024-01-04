@@ -1,8 +1,8 @@
 import { Bool, Bytes, Int, isBytes, ScryptType, SupportedParamType } from './scryptTypes';
-import { bsv } from './utils';
+import { btc } from './utils';
 
 
-const BN = bsv.crypto.BN;
+const BN = btc.crypto.BN;
 
 
 /**
@@ -19,7 +19,7 @@ export function int2hex(n: Int): string {
   }
   const number = new BN(n);
   const m = number.toSM({ endian: 'little' });
-  return bsv.Script.fromASM(m.toString('hex')).toHex();
+  return btc.Script.fromASM(m.toString('hex')).toHex();
 }
 
 
@@ -36,7 +36,7 @@ export function bytes2hex(b: Bytes): string {
   if (b) {
 
     if (b.length / 2 > 1) {
-      return bsv.Script.fromASM(b).toHex();
+      return btc.Script.fromASM(b).toHex();
     }
 
     const intValue = parseInt(b, 16);
@@ -45,7 +45,7 @@ export function bytes2hex(b: Bytes): string {
       return BigInt(intValue + 80).toString(16);
     }
 
-    return bsv.Script.fromASM(b).toHex();
+    return btc.Script.fromASM(b).toHex();
   }
   return '00';
 }
@@ -67,5 +67,5 @@ export function toScriptHex(x: SupportedParamType, type: string): string {
 
 export function toScriptASM(a: SupportedParamType, type: string): string {
   const hex = toScriptHex(a, type);
-  return bsv.Script.fromHex(hex).toASM();
+  return btc.Script.fromHex(hex).toASM();
 }

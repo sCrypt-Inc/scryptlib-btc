@@ -2,7 +2,7 @@ import { basename, dirname } from 'path';
 import { ABIEntityType, Argument, LibraryEntity, ParamEntity, parseGenericType } from '.';
 import { ContractEntity, getFullFilePath, loadSourceMapfromArtifact, OpCode, StaticEntity } from './compilerWrapper';
 import {
-  ABICoder, ABIEntity, AliasEntity, Arguments, bsv, buildContractCode, checkNOPScript, CompileResult, DEFAULT_FLAGS, findSrcInfoV1, findSrcInfoV2, FunctionCall, hash160, isArrayType, JSONParserSync, path2uri, resolveType, Script, StructEntity, subscript, TypeResolver, uri2path
+  btc, ABICoder, ABIEntity, AliasEntity, Arguments, buildContractCode, checkNOPScript, CompileResult, DEFAULT_FLAGS, findSrcInfoV1, findSrcInfoV2, FunctionCall, hash160, isArrayType, JSONParserSync, path2uri, resolveType, Script, StructEntity, subscript, TypeResolver, uri2path
 } from './internal';
 import { Bytes, Int, isScryptType, SupportedParamType, SymbolType, TypeInfo } from './scryptTypes';
 import Stateful from './stateful';
@@ -14,8 +14,8 @@ import { arrayTypeAndSize, checkSupportedParamType, flatternArg, hasGeneric, sub
  * needed only if signature is checked inside the contract.
  */
 export interface TxContext {
-  /** current transaction represented in bsv.Transaction object or hex string */
-  tx: bsv.Transaction | string;
+  /** current transaction represented in btc.Transaction object or hex string */
+  tx: btc.Transaction | string;
   /** input index */
   inputIndex: number;
   /** input amount in satoshis */
@@ -78,7 +78,7 @@ export interface Artifact {
 
 
 /** NOPScript */
-export type NOPScript = bsv.Script;
+export type NOPScript = btc.Script;
 
 
 export type AsmVarValues = { [key: string]: string }
@@ -119,7 +119,6 @@ export class AbstractContract {
   nopScript: NOPScript | null;
 
   get lockingScript(): Script {
-
     if (this.hasInlineASMVars && this.hexTemplateInlineASM.size === 0) {
       throw new Error('Values for inline ASM variables have not yet been set! Cannot get locking script.');
     }
@@ -132,7 +131,7 @@ export class AbstractContract {
     return this.codePart.add(this.dataPart);
   }
 
-  private _wrapNOPScript(lockingScript: bsv.Script) {
+  private _wrapNOPScript(lockingScript: btc.Script) {
     if (this.nopScript) {
       return this.nopScript.clone().add(lockingScript);
     }
@@ -190,7 +189,7 @@ export class AbstractContract {
     if (asmVarValues) {
       for (const key in asmVarValues) {
         const val = asmVarValues[key];
-        this.hexTemplateInlineASM.set(`<${key.startsWith('$') ? key.substring(1) : key}>`, bsv.Script.fromASM(val).toHex());
+        this.hexTemplateInlineASM.set(`<${key.startsWith('$') ? key.substring(1) : key}>`, btc.Script.fromASM(val).toHex());
       }
     }
 
@@ -210,7 +209,7 @@ export class AbstractContract {
     for (const entry of this.hexTemplateInlineASM.entries()) {
       const name = entry[0].replace('<', '').replace('>', '');
       const value = entry[1];
-      result[name] = bsv.Script.fromHex(value).toASM();
+      result[name] = btc.Script.fromHex(value).toASM();
     }
 
     return result;
@@ -261,35 +260,35 @@ export class AbstractContract {
       }
     });
 
-    return this.codePart.add(bsv.Script.fromHex(Stateful.buildState(newState, false, this.resolver)));
+    return this.codePart.add(btc.Script.fromHex(Stateful.buildState(newState, false, this.resolver)));
   }
 
-  run_verify(unlockingScript: bsv.Script | string | undefined, txContext?: TxContext): VerifyResult {
+  run_verify(unlockingScript: btc.Script | string | undefined, txContext?: TxContext): VerifyResult {
     const txCtx = Object.assign({}, this._txContext || {}, txContext || {}) as TxContext;
     let us;
     if (typeof unlockingScript === 'string') {
-      us = unlockingScript.trim() ? bsv.Script.fromASM(unlockingScript.trim()) : new bsv.Script('');
+      us = unlockingScript.trim() ? btc.Script.fromASM(unlockingScript.trim()) : new btc.Script('');
     } else {
-      us = unlockingScript ? unlockingScript : new bsv.Script('');
+      us = unlockingScript ? unlockingScript : new btc.Script('');
     }
 
-    const ls = bsv.Script.fromHex(this.lockingScript.toHex());
-    const tx = typeof txCtx.tx === 'string' ? new bsv.Transaction(txCtx.tx) : txCtx.tx;
+    const ls = btc.Script.fromHex(this.lockingScript.toHex());
+    const tx = typeof txCtx.tx === 'string' ? new btc.Transaction(txCtx.tx) : txCtx.tx;
     const inputIndex = txCtx.inputIndex;
     const inputSatoshis = txCtx.inputSatoshis;
 
 
-    bsv.Script.Interpreter.MAX_SCRIPT_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
-    bsv.Script.Interpreter.MAXIMUM_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
+    btc.Script.Interpreter.MAX_SCRIPT_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
+    btc.Script.Interpreter.MAXIMUM_ELEMENT_SIZE = Number.MAX_SAFE_INTEGER;
 
 
-    const bsi = new bsv.Script.Interpreter();
+    const bsi = new btc.Script.Interpreter();
 
     let failedAt: any = {};
 
     bsi.stepListener = function (step: any) {
-      if (step.fExec || (bsv.Opcode.OP_IF <= step.opcode.toNumber() && step.opcode.toNumber() <= bsv.Opcode.OP_ENDIF)) {
-        if ((bsv.Opcode.OP_IF <= step.opcode.toNumber() && step.opcode.toNumber() <= bsv.Opcode.OP_ENDIF) || step.opcode.toNumber() === bsv.Opcode.OP_RETURN) /**Opreturn */ {
+      if (step.fExec || (btc.Opcode.OP_IF <= step.opcode.toNumber() && step.opcode.toNumber() <= btc.Opcode.OP_ENDIF)) {
+        if ((btc.Opcode.OP_IF <= step.opcode.toNumber() && step.opcode.toNumber() <= btc.Opcode.OP_ENDIF) || step.opcode.toNumber() === btc.Opcode.OP_RETURN) /**Opreturn */ {
           failedAt.opcode = step.opcode;
         } else {
           failedAt = step;
@@ -297,7 +296,7 @@ export class AbstractContract {
       }
     };
 
-    const result = bsi.verify(us, ls, tx, inputIndex, DEFAULT_FLAGS, new bsv.crypto.BN(inputSatoshis));
+    const result = bsi.verify(us, ls, tx, inputIndex, DEFAULT_FLAGS, new btc.crypto.BN(inputSatoshis));
     if (result) {
       return {
         success: true,
@@ -340,7 +339,7 @@ export class AbstractContract {
   }): string {
     const failedOpCode: number = err.failedAt.opcode;
 
-    let error = `VerifyError: ${err.error}, fails at ${new bsv.Opcode(failedOpCode)}\n`;
+    let error = `VerifyError: ${err.error}, fails at ${new btc.Opcode(failedOpCode)}\n`;
 
     if (this.sourceMapFile) {
       const sourceMapFilePath = uri2path(this.sourceMapFile);
@@ -356,7 +355,7 @@ export class AbstractContract {
       const pos = findSrcInfoV2(err.failedAt.pc, sourceMap);
 
       if (pos && sources[pos[1]]) {
-        error = `VerifyError: ${err.error} \n\t[Go to Source](${path2uri(sources[pos[1]])}#${pos[2]})  fails at ${new bsv.Opcode(failedOpCode)}\n`;
+        error = `VerifyError: ${err.error} \n\t[Go to Source](${path2uri(sources[pos[1]])}#${pos[2]})  fails at ${new btc.Opcode(failedOpCode)}\n`;
       }
     } else if (this.version <= 8) {
 
@@ -386,7 +385,7 @@ export class AbstractContract {
 
           // in vscode termianal need to use [:] to jump to file line, but here need to use [#] to jump to file line in output channel.
           if (opcode && opcode.pos) {
-            error = `VerifyError: ${err.error} \n\t[Go to Source](${path2uri(opcode.pos.file)}#${opcode.pos.line})  fails at ${new bsv.Opcode(failedOpCode)}\n`;
+            error = `VerifyError: ${err.error} \n\t[Go to Source](${path2uri(opcode.pos.file)}#${opcode.pos.line})  fails at ${new btc.Opcode(failedOpCode)}\n`;
           }
         }
       }
@@ -425,11 +424,11 @@ export class AbstractContract {
 
     if (AbstractContract.isStateful(this)) {
       const state = Stateful.buildState(this.statePropsArgs, this.isGenesis, this.resolver);
-      return bsv.Script.fromHex(state);
+      return btc.Script.fromHex(state);
     }
 
     if (this._dataPartInHex) {
-      return bsv.Script.fromHex(this._dataPartInHex);
+      return btc.Script.fromHex(this._dataPartInHex);
     }
 
   }
@@ -460,7 +459,7 @@ export class AbstractContract {
       throw new Error('should not use `setDataPartInASM` for a stateful contract, using `setDataPartInHex`');
     }
     const dataPartInASM = asm.trim();
-    this.setDataPartInHex(bsv.Script.fromASM(dataPartInASM).toHex());
+    this.setDataPartInHex(btc.Script.fromASM(dataPartInASM).toHex());
   }
 
   /**
@@ -477,7 +476,7 @@ export class AbstractContract {
   }
 
   prependNOPScript(nopScript: NOPScript | null): void {
-    if (nopScript instanceof bsv.Script) {
+    if (nopScript instanceof btc.Script) {
       checkNOPScript(nopScript);
     }
 
@@ -491,7 +490,7 @@ export class AbstractContract {
   get codePart(): Script {
     const contractScript = this.scriptedConstructor.toScript();
     // note: do not trim the trailing space
-    return this._wrapNOPScript(contractScript.clone()).add(bsv.Script.fromHex('6a'));
+    return this._wrapNOPScript(contractScript.clone()).add(btc.Script.fromHex('6a'));
   }
 
   get codeHash(): string {
@@ -686,7 +685,7 @@ export class AbstractContract {
 
 
   static fromASM(asm: string): AbstractContract {
-    return this.fromHex(bsv.Script.fromASM(asm).toHex());
+    return this.fromHex(btc.Script.fromASM(asm).toHex());
   }
 
   static fromHex(hex: string): AbstractContract {
@@ -700,7 +699,7 @@ export class AbstractContract {
 
 
   static fromTransaction(hex: string, outputIndex = 0): AbstractContract {
-    const tx = new bsv.Transaction(hex);
+    const tx = new btc.Transaction(hex);
     return this.fromHex(tx.outputs[outputIndex].script.toHex());
   }
 
@@ -731,23 +730,23 @@ export class AbstractContract {
     if (flattened.length === 1) {
       const hex = Stateful.serialize(flattened[0].value, flattened[0].type);
 
-      return bsv.crypto.Hash.sha256(Buffer.from(hex, 'hex')).toString('hex');
+      return btc.crypto.Hash.sha256(Buffer.from(hex, 'hex')).toString('hex');
     } else {
       const jointbytes = flattened.map(item => {
         const hex = Stateful.serialize(item.value, item.type);
-        return bsv.crypto.Hash.sha256(Buffer.from(hex, 'hex')).toString('hex');
+        return btc.crypto.Hash.sha256(Buffer.from(hex, 'hex')).toString('hex');
       }).join('');
 
-      return bsv.crypto.Hash.sha256(Buffer.from(jointbytes, 'hex')).toString('hex');
+      return btc.crypto.Hash.sha256(Buffer.from(jointbytes, 'hex')).toString('hex');
     }
   }
 
   // sort the map by the result of flattenSha256 of the key
   private static sortmap(map: Map<SupportedParamType, SupportedParamType>, keyType: string): Map<SupportedParamType, SupportedParamType> {
     return new Map([...map.entries()].sort((a, b) => {
-      return bsv.crypto.BN.fromSM(Buffer.from(this.flattenSha256(a[0], keyType), 'hex'), {
+      return btc.crypto.BN.fromSM(Buffer.from(this.flattenSha256(a[0], keyType), 'hex'), {
         endian: 'little'
-      }).cmp(bsv.crypto.BN.fromSM(Buffer.from(this.flattenSha256(b[0], keyType), 'hex'), {
+      }).cmp(btc.crypto.BN.fromSM(Buffer.from(this.flattenSha256(b[0], keyType), 'hex'), {
         endian: 'little'
       }));
     }));
@@ -756,9 +755,9 @@ export class AbstractContract {
   // sort the set by the result of flattenSha256 of the key
   private static sortset(set: Set<SupportedParamType>, keyType: string): Set<SupportedParamType> {
     return new Set([...set.keys()].sort((a, b) => {
-      return bsv.crypto.BN.fromSM(Buffer.from(this.flattenSha256(a, keyType), 'hex'), {
+      return btc.crypto.BN.fromSM(Buffer.from(this.flattenSha256(a, keyType), 'hex'), {
         endian: 'little'
-      }).cmp(bsv.crypto.BN.fromSM(Buffer.from(this.flattenSha256(b, keyType), 'hex'), {
+      }).cmp(btc.crypto.BN.fromSM(Buffer.from(this.flattenSha256(b, keyType), 'hex'), {
         endian: 'little'
       }));
     }));
@@ -767,9 +766,9 @@ export class AbstractContract {
 
   private static sortkeys(keys: SupportedParamType[], keyType: string): SupportedParamType[] {
     return keys.sort((a, b) => {
-      return bsv.crypto.BN.fromSM(Buffer.from(this.flattenSha256(a, keyType), 'hex'), {
+      return btc.crypto.BN.fromSM(Buffer.from(this.flattenSha256(a, keyType), 'hex'), {
         endian: 'little'
-      }).cmp(bsv.crypto.BN.fromSM(Buffer.from(this.flattenSha256(b, keyType), 'hex'), {
+      }).cmp(btc.crypto.BN.fromSM(Buffer.from(this.flattenSha256(b, keyType), 'hex'), {
         endian: 'little'
       }));
     });

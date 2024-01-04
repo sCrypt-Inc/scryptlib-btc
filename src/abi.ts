@@ -7,9 +7,9 @@ import { SupportedParamType, TypeResolver, Int } from './scryptTypes';
 import { toScriptHex } from './serializer';
 import Stateful from './stateful';
 import { flatternArg } from './typeCheck';
-import { asm2int, bsv, buildContractCode, int2Asm } from './utils';
+import { asm2int, btc, buildContractCode, int2Asm } from './utils';
 
-export type Script = bsv.Script;
+export type Script = btc.Script;
 
 export type FileUri = string;
 
@@ -54,8 +54,14 @@ export class FunctionCall {
 
   private _lockingScript?: Script;
 
+  private _witnesses?: Buffer[];
+
   get unlockingScript(): Script | undefined {
     return this._unlockingScript;
+  }
+
+  get witnesses(): Buffer[] | undefined {
+    return this._witnesses;
   }
 
   get lockingScript(): Script | undefined {
@@ -72,6 +78,7 @@ export class FunctionCall {
       contract: AbstractContract;
       unlockingScript?: Script;
       lockingScript?: Script;
+      witnesses?: Buffer[];
       args: Arguments;
     }
   ) {
@@ -90,6 +97,10 @@ export class FunctionCall {
 
     if (binding.unlockingScript) {
       this._unlockingScript = binding.unlockingScript;
+    }
+
+    if (binding.witnesses) {
+      this._witnesses = binding.witnesses
     }
   }
 
@@ -137,6 +148,7 @@ export class FunctionCall {
   }
 
   verify(txContext?: TxContext): VerifyResult {
+    // TODO
     const result = this.contract.run_verify(this.unlockingScript, txContext);
 
     if (!result.success) {
@@ -157,7 +169,7 @@ export interface CallData {
   /** name of public function */
   methodName: string;
   /** unlocking Script */
-  unlockingScript: bsv.Script;
+  unlockingScript: btc.Script;
   /** function arguments */
   args: Arguments;
 }
@@ -221,7 +233,7 @@ export class ABICoder {
   }
 
   encodeConstructorCallFromRawHex(contract: AbstractContract, hexTemplate: string, raw: string): FunctionCall {
-    const script = bsv.Script.fromHex(raw);
+    const script = btc.Script.fromHex(raw);
     const constructorABI = this.abi.filter(entity => entity.type === ABIEntityType.CONSTRUCTOR)[0];
     const cParams = constructorABI?.params || [];
 
@@ -232,7 +244,7 @@ export class ABICoder {
     let codePartEndIndex = -1;
 
     const err = new Error(`the raw script cannot match the ASM template of contract ${contract.contractName}`);
-    function checkOp(chunk: bsv.Script.IOpChunk) {
+    function checkOp(chunk: btc.Script.IOpChunk) {
 
       const op = hexTemplate.substring(offset, offset + 2);
       if (parseInt(op, 16) != chunk.opcodenum) {
@@ -241,7 +253,7 @@ export class ABICoder {
       offset = offset + 2;
     }
 
-    function checkPushByteLength(chunk: bsv.Script.IOpChunk) {
+    function checkPushByteLength(chunk: btc.Script.IOpChunk) {
 
       const op = hexTemplate.substring(offset, offset + 2);
       if (parseInt(op, 16) != chunk.opcodenum) {
@@ -258,7 +270,7 @@ export class ABICoder {
     }
 
 
-    function checkPushData1(chunk: bsv.Script.IOpChunk) {
+    function checkPushData1(chunk: btc.Script.IOpChunk) {
 
       const op = hexTemplate.substring(offset, offset + 2);
       if (parseInt(op, 16) != chunk.opcodenum) {
@@ -282,7 +294,7 @@ export class ABICoder {
       offset = offset + chunk.len * 2;
     }
 
-    function checkPushData2(chunk: bsv.Script.IOpChunk) {
+    function checkPushData2(chunk: btc.Script.IOpChunk) {
 
       const op = hexTemplate.substring(offset, offset + 2);
       if (parseInt(op, 16) != chunk.opcodenum) {
@@ -306,7 +318,7 @@ export class ABICoder {
       offset = offset + chunk.len * 2;
     }
 
-    function checkPushData4(chunk: bsv.Script.IOpChunk) {
+    function checkPushData4(chunk: btc.Script.IOpChunk) {
 
       const op = hexTemplate.substring(offset, offset + 2);
       if (parseInt(op, 16) != chunk.opcodenum) {
@@ -353,20 +365,20 @@ export class ABICoder {
       }
     }
 
-    function saveTemplateVariableValue(name: string, chunk: bsv.Script.IOpChunk) {
-      const bw = new bsv.encoding.BufferWriter();
+    function saveTemplateVariableValue(name: string, chunk: btc.Script.IOpChunk) {
+      const bw = new btc.encoding.BufferWriter();
 
       bw.writeUInt8(chunk.opcodenum);
       if (chunk.buf) {
-        if (chunk.opcodenum < bsv.Opcode.OP_PUSHDATA1) {
+        if (chunk.opcodenum < btc.Opcode.OP_PUSHDATA1) {
           bw.write(chunk.buf);
-        } else if (chunk.opcodenum === bsv.Opcode.OP_PUSHDATA1) {
+        } else if (chunk.opcodenum === btc.Opcode.OP_PUSHDATA1) {
           bw.writeUInt8(chunk.len);
           bw.write(chunk.buf);
-        } else if (chunk.opcodenum === bsv.Opcode.OP_PUSHDATA2) {
+        } else if (chunk.opcodenum === btc.Opcode.OP_PUSHDATA2) {
           bw.writeUInt16LE(chunk.len);
           bw.write(chunk.buf);
-        } else if (chunk.opcodenum === bsv.Opcode.OP_PUSHDATA4) {
+        } else if (chunk.opcodenum === btc.Opcode.OP_PUSHDATA4) {
           bw.writeUInt32LE(chunk.len);
           bw.write(chunk.buf);
         }
@@ -390,7 +402,7 @@ export class ABICoder {
 
             if (offset >= hexTemplate.length) {
 
-              const b = bsv.Script.fromChunks(script.chunks.slice(index + 1));
+              const b = btc.Script.fromChunks(script.chunks.slice(index + 1));
 
               dataPartInHex = b.toHex();
               codePartEndIndex = index;
@@ -511,7 +523,7 @@ export class ABICoder {
 
     return new FunctionCall('constructor', {
       contract,
-      lockingScript: codePartEndIndex > -1 ? bsv.Script.fromChunks(script.chunks.slice(0, codePartEndIndex)) : script,
+      lockingScript: codePartEndIndex > -1 ? btc.Script.fromChunks(script.chunks.slice(0, codePartEndIndex)) : script,
       args: ctorArgs
     });
 
@@ -535,10 +547,17 @@ export class ABICoder {
         if (this.abi.length > 2 && entity.index !== undefined) {
           // selector when there are multiple public functions
           const pubFuncIndex = entity.index;
-          hex += `${bsv.Script.fromASM(int2Asm(pubFuncIndex.toString())).toHex()}`;
+          hex += `${btc.Script.fromASM(int2Asm(pubFuncIndex.toString())).toHex()}`;
         }
+
+        const unlockingScript = btc.Script.fromHex(hex)
+        const witnesses = unlockingScript.toWitnesses()
+
         return new FunctionCall(name, {
-          contract, unlockingScript: bsv.Script.fromHex(hex), args: entity.params.map((param, index) => ({
+          contract,
+          unlockingScript: unlockingScript,
+          witnesses: witnesses,
+          args: entity.params.map((param, index) => ({
             name: param.name,
             type: param.type,
             value: args_[index]
@@ -571,7 +590,7 @@ export class ABICoder {
      */
   parseCallData(hex: string): CallData {
 
-    const unlockingScript = bsv.Script.fromHex(hex);
+    const unlockingScript = btc.Script.fromHex(hex);
 
     const usASM = unlockingScript.toASM() as string;
 
@@ -617,7 +636,7 @@ export class ABICoder {
 
     dummyArgs.forEach((farg: Argument, index: number) => {
 
-      hexTemplateArgs.set(`<${farg.name}>`, bsv.Script.fromASM(asmOpcodes[index]).toHex());
+      hexTemplateArgs.set(`<${farg.name}>`, btc.Script.fromASM(asmOpcodes[index]).toHex());
 
     });
 

@@ -1,7 +1,7 @@
 {
-  "name": "scryptlib",
-  "version": "2.1.37",
-  "description": "Javascript SDK for integration of Bitcoin SV Smart Contracts written in sCrypt language.",
+  "name": "scryptlib-btc",
+  "version": "0.1.0",
+  "description": "",
   "engines": {
     "node": ">=14.0.0"
   },
@@ -33,7 +33,6 @@
     "url": "git+https://github.com/scrypt-sv/scryptlib.git"
   },
   "keywords": [
-    "bsv",
     "sCrypt",
     "Javascript",
     "API"
@@ -73,6 +72,7 @@
     "node-fetch": "^3.0.0",
     "patch-package": "^6.4.7",
     "rimraf": "^3.0.2",
+    "scrypt-bitcore-lib": "^10.0.25",
     "yargs": "^17.6.2"
   }
 }

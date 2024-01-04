@@ -1,7 +1,7 @@
 import { Argument, arrayTypeAndSize, bin2num, isArrayType, LibraryEntity, ParamEntity, StructEntity, SymbolType, TypeResolver } from '.';
 import { Bool, Bytes, Int, OpCodeType, PrivKey, PubKey, Ripemd160, ScryptType, Sha1, Sha256, Sig, SigHashPreimage, SigHashType, StructObject, SupportedParamType } from './scryptTypes';
 import Stateful from './stateful';
-import { bsv } from './utils';
+import { btc } from './utils';
 
 /**
  * little-endian signed magnitude to int
@@ -13,7 +13,7 @@ export function hex2int(hex: string): bigint {
   } else if (hex === '4f') {
     return Int(-1);
   } else {
-    const b = bsv.Script.fromHex(hex);
+    const b = btc.Script.fromHex(hex);
     const chuck = b.chunks[0];
 
     if (chuck.opcodenum >= 81 && chuck.opcodenum <= 96) {
@@ -39,7 +39,7 @@ export function hex2bytes(hex: string): Bytes {
     return '';
   }
 
-  const s = bsv.Script.fromHex(hex);
+  const s = btc.Script.fromHex(hex);
   const chuck = s.chunks[0];
 
   if (chuck.opcodenum >= 81 && chuck.opcodenum <= 96) {
