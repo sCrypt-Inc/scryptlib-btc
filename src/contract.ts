@@ -872,6 +872,30 @@ export function buildContractClass(artifact: Artifact | CompileResult): typeof A
     throw new Error('Missing field `hex` in artifact');
   }
 
+  // Check if artifact hex contains any non-enabled op-codes.
+  const script = btc.Script.fromHex(artifact.hex.replace(/<[^>]*>/g, ''));
+  script.chunks.forEach(chunk => {
+    if (
+      chunk.opcodenum === btc.Opcode.OP_CAT ||
+      chunk.opcodenum === btc.Opcode.OP_SUBSTR ||
+      chunk.opcodenum === btc.Opcode.OP_LEFT ||
+      chunk.opcodenum === btc.Opcode.OP_RIGHT ||
+      chunk.opcodenum === btc.Opcode.OP_INVERT ||
+      chunk.opcodenum === btc.Opcode.OP_AND ||
+      chunk.opcodenum === btc.Opcode.OP_OR ||
+      chunk.opcodenum === btc.Opcode.OP_XOR ||
+      chunk.opcodenum === btc.Opcode.OP_2MUL ||
+      chunk.opcodenum === btc.Opcode.OP_2DIV ||
+      chunk.opcodenum === btc.Opcode.OP_MUL ||
+      chunk.opcodenum === btc.Opcode.OP_DIV ||
+      chunk.opcodenum === btc.Opcode.OP_MOD ||
+      chunk.opcodenum === btc.Opcode.OP_LSHIFT ||
+      chunk.opcodenum === btc.Opcode.OP_RSHIFT
+    ) {
+      throw new Error(`Compiled contract script contains disabled op-code.`);
+    }
+  })
+
 
   const ContractClass = class extends AbstractContract {
     constructor(...ctorParams: SupportedParamType[]) {
@@ -945,7 +969,6 @@ export function buildContractClass(artifact: Artifact | CompileResult): typeof A
   });
 
   return ContractClass;
-
 }
 
 
